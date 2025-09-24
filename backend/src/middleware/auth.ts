@@ -28,7 +28,14 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
     }
 
     // Vérifier le token
-    const decoded: JWTPayload = verifyToken(token);
+    const decoded = verifyToken(token);
+    if (!decoded) {
+      res.status(401).json({
+        success: false,
+        message: 'Token invalide'
+      });
+      return;
+    }
     
     // Récupérer l'utilisateur depuis la base de données
     const user = await User.findById(decoded.userId).select('-password');
@@ -51,7 +58,7 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
 
     // Ajouter l'utilisateur à la requête
     req.user = user;
-    req.userId = user._id.toString();
+    req.userId = (user._id as any).toString();
     
     next();
   } catch (error: any) {
@@ -81,12 +88,17 @@ export const optionalAuth = async (req: Request, res: Response, next: NextFuncti
       return;
     }
 
-    const decoded: JWTPayload = verifyToken(token);
+    const decoded = verifyToken(token);
+    if (!decoded) {
+      next();
+      return;
+    }
+    
     const user = await User.findById(decoded.userId).select('-password');
     
     if (user && user.isActive) {
       req.user = user;
-      req.userId = user._id.toString();
+      req.userId = (user._id as any).toString();
     }
     
     next();

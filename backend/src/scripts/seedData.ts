@@ -95,7 +95,7 @@ Un jardin enchanté aux mille roses.`,
         durationMinutes: 2,
         description: "Un poème magique sur un jardin où poussent des âmes...",
         tags: ["nature", "magie", "jardin", "fleurs"],
-        createdBy: users[1]._id, // Teacher
+        createdBy: users[1]!._id, // Teacher
         readCount: 15,
         averageScore: 85
       },
@@ -122,7 +122,7 @@ Et volons vers notre amour.`,
         durationMinutes: 4,
         description: "Suivez le voyage d'un oiseau curieux à travers les nuages...",
         tags: ["aventure", "liberté", "voyage", "oiseau"],
-        createdBy: users[1]._id,
+        createdBy: users[1]!._id,
         readCount: 8,
         averageScore: 78
       },
@@ -149,7 +149,7 @@ C'est le plus beau des cadeaux.`,
         durationMinutes: 3,
         description: "Une belle histoire d'amitié entre deux enfants inséparables...",
         tags: ["amitié", "fidélité", "partage", "enfance"],
-        createdBy: users[1]._id,
+        createdBy: users[1]!._id,
         readCount: 22,
         averageScore: 92
       },
@@ -181,7 +181,7 @@ Tout devient possible pour nous.`,
         durationMinutes: 6,
         description: "Un château mystérieux flotte dans les nuages...",
         tags: ["imagination", "rêve", "magie", "château"],
-        createdBy: users[1]._id,
+        createdBy: users[1]!._id,
         readCount: 5,
         averageScore: 88
       },
@@ -208,7 +208,7 @@ Dans une ronde enchantée.`,
         durationMinutes: 3,
         description: "Un voyage poétique à travers les quatre saisons...",
         tags: ["saisons", "nature", "cycle", "beauté"],
-        createdBy: users[1]._id,
+        createdBy: users[1]!._id,
         readCount: 12,
         averageScore: 81
       }
@@ -223,8 +223,8 @@ Dans une ronde enchantée.`,
     // Emma lit plusieurs poèmes
     readings.push(
       {
-        userId: users[2]._id, // Emma
-        poemId: poems[0]._id, // Le Jardin Enchanté
+        userId: users[2]!._id, // Emma
+        poemId: poems[0]!._id, // Le Jardin Enchanté
         score: 89,
         durationSeconds: 125,
         completed: true,
@@ -240,8 +240,8 @@ Dans une ronde enchantée.`,
         }
       },
       {
-        userId: users[2]._id, // Emma
-        poemId: poems[2]._id, // Mon Meilleur Ami
+        userId: users[2]!._id, // Emma
+        poemId: poems[2]!._id, // Mon Meilleur Ami
         score: 92,
         durationSeconds: 180,
         completed: true,
@@ -259,8 +259,8 @@ Dans une ronde enchantée.`,
     // Lucas lit d'autres poèmes
     readings.push(
       {
-        userId: users[3]._id, // Lucas
-        poemId: poems[1]._id, // L'Oiseau Voyageur
+        userId: users[3]!._id, // Lucas
+        poemId: poems[1]!._id, // L'Oiseau Voyageur
         score: 78,
         durationSeconds: 245,
         completed: true,
@@ -277,8 +277,8 @@ Dans une ronde enchantée.`,
         }
       },
       {
-        userId: users[3]._id, // Lucas
-        poemId: poems[4]._id, // La Danse des Saisons
+        userId: users[3]!._id, // Lucas
+        poemId: poems[4]!._id, // La Danse des Saisons
         score: 85,
         durationSeconds: 195,
         completed: true,
@@ -302,16 +302,16 @@ Dans une ronde enchantée.`,
     console.log('⭐ Création des favoris...');
     const favorites = await Favorite.insertMany([
       {
-        userId: users[2]._id, // Emma
-        poemId: poems[2]._id  // Mon Meilleur Ami
+        userId: users[2]!._id, // Emma
+        poemId: poems[2]!._id  // Mon Meilleur Ami
       },
       {
-        userId: users[2]._id, // Emma
-        poemId: poems[3]._id  // Le Château de Nuages
+        userId: users[2]!._id, // Emma
+        poemId: poems[3]!._id  // Le Château de Nuages
       },
       {
-        userId: users[3]._id, // Lucas
-        poemId: poems[1]._id  // L'Oiseau Voyageur
+        userId: users[3]!._id, // Lucas
+        poemId: poems[1]!._id  // L'Oiseau Voyageur
       }
     ]);
 
@@ -332,7 +332,7 @@ Dans une ronde enchantée.`,
 
     const progressData = await Progress.insertMany([
       {
-        userId: users[2]._id, // Emma
+        userId: users[2]!._id, // Emma
         weekStart: previousWeekStart,
         readingsCompleted: 2,
         totalTimeMinutes: 5.08,
@@ -346,7 +346,7 @@ Dans une ronde enchantée.`,
         totalMistakes: 1
       },
       {
-        userId: users[3]._id, // Lucas
+        userId: users[3]!._id, // Lucas
         weekStart: previousWeekStart,
         readingsCompleted: 2,
         totalTimeMinutes: 7.33,

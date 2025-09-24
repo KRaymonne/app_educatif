@@ -14,10 +14,13 @@ export interface JWTPayload {
  */
 export const generateToken = (payload: Omit<JWTPayload, 'iat' | 'exp'>): string => {
   try {
-    return jwt.sign(payload, config.JWT_SECRET, {
-      expiresIn: config.JWT_EXPIRES_IN,
-      issuer: 'app-educatif',
-      audience: 'app-educatif-users'
+    const secret = config.JWT_SECRET;
+    if (!secret) {
+      throw new Error('JWT_SECRET non défini');
+    }
+    
+    return jwt.sign(payload, secret, {
+      expiresIn: config.JWT_EXPIRES_IN || '7d'
     });
   } catch (error) {
     console.error('❌ Erreur lors de la génération du token:', error);
@@ -28,36 +31,17 @@ export const generateToken = (payload: Omit<JWTPayload, 'iat' | 'exp'>): string 
 /**
  * Vérifie et décode un token JWT
  */
-export const verifyToken = (token: string): JWTPayload => {
+export const verifyToken = (token: string): JWTPayload | null => {
   try {
-    const decoded = jwt.verify(token, config.JWT_SECRET, {
-      issuer: 'app-educatif',
-      audience: 'app-educatif-users'
-    }) as JWTPayload;
+    const secret = config.JWT_SECRET;
+    if (!secret) {
+      throw new Error('JWT_SECRET non défini');
+    }
     
+    const decoded = jwt.verify(token, secret) as JWTPayload;
     return decoded;
   } catch (error) {
-    if (error instanceof jwt.TokenExpiredError) {
-      throw new Error('Token expiré');
-    } else if (error instanceof jwt.JsonWebTokenError) {
-      throw new Error('Token invalide');
-    } else if (error instanceof jwt.NotBeforeError) {
-      throw new Error('Token pas encore valide');
-    } else {
-      console.error('❌ Erreur lors de la vérification du token:', error);
-      throw new Error('Erreur lors de la vérification du token');
-    }
-  }
-};
-
-/**
- * Décode un token sans le vérifier (utile pour récupérer des infos d'un token expiré)
- */
-export const decodeToken = (token: string): JWTPayload | null => {
-  try {
-    return jwt.decode(token) as JWTPayload;
-  } catch (error) {
-    console.error('❌ Erreur lors du décodage du token:', error);
+    console.error('❌ Token invalide:', error);
     return null;
   }
 };
@@ -67,12 +51,17 @@ export const decodeToken = (token: string): JWTPayload | null => {
  */
 export const isTokenExpired = (token: string): boolean => {
   try {
-    const decoded = decodeToken(token);
-    if (!decoded || !decoded.exp) return true;
+    const secret = config.JWT_SECRET;
+    if (!secret) {
+      return true;
+    }
     
-    const currentTime = Math.floor(Date.now() / 1000);
-    return decoded.exp < currentTime;
-  } catch (error) {
+    jwt.verify(token, secret);
+    return false;
+  } catch (error: any) {
+    if (error.name === 'TokenExpiredError') {
+      return true;
+    }
     return true;
   }
 };
@@ -88,7 +77,7 @@ export const extractTokenFromHeader = (authHeader: string | undefined): string |
     return null;
   }
   
-  return parts[1];
+  return parts[1] || null;
 };
 
 /**
@@ -96,10 +85,13 @@ export const extractTokenFromHeader = (authHeader: string | undefined): string |
  */
 export const generateRefreshToken = (payload: Omit<JWTPayload, 'iat' | 'exp'>): string => {
   try {
-    return jwt.sign(payload, config.JWT_SECRET, {
-      expiresIn: '30d', // Token de rafraîchissement valide 30 jours
-      issuer: 'app-educatif',
-      audience: 'app-educatif-refresh'
+    const secret = config.JWT_SECRET;
+    if (!secret) {
+      throw new Error('JWT_SECRET non défini');
+    }
+    
+    return jwt.sign(payload, secret, {
+      expiresIn: '30d' // Token de rafraîchissement valide 30 jours
     });
   } catch (error) {
     console.error('❌ Erreur lors de la génération du refresh token:', error);
@@ -108,24 +100,64 @@ export const generateRefreshToken = (payload: Omit<JWTPayload, 'iat' | 'exp'>): 
 };
 
 /**
- * Vérifie un token de rafraîchissement
+ * Vérifie et décode un refresh token
  */
-export const verifyRefreshToken = (token: string): JWTPayload => {
+export const verifyRefreshToken = (token: string): JWTPayload | null => {
   try {
-    const decoded = jwt.verify(token, config.JWT_SECRET, {
-      issuer: 'app-educatif',
-      audience: 'app-educatif-refresh'
-    }) as JWTPayload;
+    const secret = config.JWT_SECRET;
+    if (!secret) {
+      throw new Error('JWT_SECRET non défini');
+    }
     
+    const decoded = jwt.verify(token, secret) as JWTPayload;
     return decoded;
   } catch (error) {
-    if (error instanceof jwt.TokenExpiredError) {
-      throw new Error('Refresh token expiré');
-    } else if (error instanceof jwt.JsonWebTokenError) {
-      throw new Error('Refresh token invalide');
-    } else {
-      console.error('❌ Erreur lors de la vérification du refresh token:', error);
-      throw new Error('Erreur lors de la vérification du refresh token');
-    }
+    console.error('❌ Refresh token invalide:', error);
+    return null;
+  }
+};
+
+/**
+ * Décode un token sans vérification (pour debug uniquement)
+ */
+export const decodeToken = (token: string): JWTPayload | null => {
+  try {
+    const decoded = jwt.decode(token) as JWTPayload;
+    return decoded;
+  } catch (error) {
+    console.error('❌ Erreur lors du décodage du token:', error);
+    return null;
+  }
+};
+
+/**
+ * Obtient le temps d'expiration d'un token en secondes
+ */
+export const getTokenExpirationTime = (token: string): number | null => {
+  try {
+    const decoded = jwt.decode(token) as JWTPayload;
+    return decoded.exp || null;
+  } catch (error) {
+    console.error('❌ Erreur lors de la lecture de l\'expiration du token:', error);
+    return null;
+  }
+};
+
+/**
+ * Vérifie si un token expire bientôt (dans les 5 minutes)
+ */
+export const isTokenExpiringSoon = (token: string): boolean => {
+  try {
+    const expirationTime = getTokenExpirationTime(token);
+    if (!expirationTime) return true;
+    
+    const currentTime = Math.floor(Date.now() / 1000);
+    const timeUntilExpiration = expirationTime - currentTime;
+    
+    // Retourne true si le token expire dans moins de 5 minutes (300 secondes)
+    return timeUntilExpiration < 300;
+  } catch (error) {
+    console.error('❌ Erreur lors de la vérification de l\'expiration du token:', error);
+    return true;
   }
 };
