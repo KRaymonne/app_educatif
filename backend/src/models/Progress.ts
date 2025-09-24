@@ -127,7 +127,7 @@ progressSchema.statics.getCurrentWeekProgress = async function(userId: string) {
 
 // Méthode statique pour mettre à jour le progrès après une lecture
 progressSchema.statics.updateAfterReading = async function(userId: string, reading: any) {
-  const progress = await this.getCurrentWeekProgress(userId);
+  const progress = await (this as any).getCurrentWeekProgress(userId);
   
   // Recalculer les statistiques de la semaine
   const Reading = mongoose.model('Reading');
@@ -202,7 +202,7 @@ progressSchema.statics.getMonthlyStats = async function(userId: string, year: nu
     weekStart: { $gte: startDate, $lte: endDate }
   }).sort({ weekStart: 1 });
 
-  const totalStats = monthlyProgress.reduce((acc, week) => ({
+  const totalStats = monthlyProgress.reduce((acc: any, week: any) => ({
     totalReadings: acc.totalReadings + week.readingsCompleted,
     totalTimeMinutes: acc.totalTimeMinutes + week.totalTimeMinutes,
     averageScore: acc.averageScore + week.averageScore,

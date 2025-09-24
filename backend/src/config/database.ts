@@ -10,8 +10,6 @@ export const connectDatabase = async (): Promise<void> => {
       maxPoolSize: 10, // Maintenir jusqu'à 10 connexions socket
       serverSelectionTimeoutMS: 5000, // Garder en essayant d'envoyer des opérations pendant 5 secondes
       socketTimeoutMS: 45000, // Fermer les sockets après 45 secondes d'inactivité
-      bufferMaxEntries: 0, // Désactiver la mise en mémoire tampon de mongoose
-      bufferCommands: false, // Désactiver la mise en mémoire tampon de mongoose
     });
 
     console.log(`✅ MongoDB connecté avec succès à: ${mongoUri.replace(/\/\/.*@/, '//***:***@')}`);
@@ -67,7 +65,9 @@ export const clearDatabase = async (): Promise<void> => {
     
     for (const key in collections) {
       const collection = collections[key];
-      await collection.deleteMany({});
+      if (collection) {
+        await collection.deleteMany({});
+      }
     }
     
     console.log('🧹 Base de données nettoyée');
@@ -85,7 +85,10 @@ export const isDatabaseConnected = (): boolean => {
 // Fonction pour obtenir les statistiques de la base de données
 export const getDatabaseStats = async () => {
   try {
-    const stats = await mongoose.connection.db.stats();
+    const stats = await mongoose.connection.db?.stats();
+    if (!stats) {
+      throw new Error('Impossible d\'obtenir les statistiques de la base de données');
+    }
     return {
       collections: stats.collections,
       dataSize: stats.dataSize,

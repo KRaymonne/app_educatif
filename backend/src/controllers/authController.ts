@@ -50,7 +50,10 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       res.status(400).json({
         success: false,
         message: 'Données invalides',
-        errors: error.details.map(detail => detail.message)
+        errors: error.details.map(detail => ({
+          field: detail.path.join('.'),
+          message: detail.message
+        }))
       });
       return;
     }
@@ -68,20 +71,25 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     }
 
     // Créer le nouvel utilisateur
-    const user = new User({
+    const userData: Partial<IUser> = {
       email: email.toLowerCase(),
       password,
       name,
-      role,
-      level,
-      classId
-    });
+      role: role || 'student',
+      level: level || 'Débutant',
+      isActive: true
+    };
 
+    if (classId && role === 'student') {
+      userData.classId = classId;
+    }
+
+    const user = new User(userData);
     await user.save();
 
     // Générer les tokens
     const tokenPayload = {
-      userId: user._id.toString(),
+      userId: (user._id as any).toString(),
       email: user.email,
       role: user.role
     };
@@ -102,17 +110,8 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       }
     });
 
-  } catch (error: any) {
-    console.error('❌ Erreur lors de l\'inscription:', error);
-    
-    if (error.code === 11000) {
-      res.status(409).json({
-        success: false,
-        message: 'Un utilisateur avec cet email existe déjà'
-      });
-      return;
-    }
-
+  } catch (error) {
+    console.error('Erreur lors de l\'inscription:', error);
     res.status(500).json({
       success: false,
       message: 'Erreur interne du serveur'
@@ -131,15 +130,22 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       res.status(400).json({
         success: false,
         message: 'Données invalides',
-        errors: error.details.map(detail => detail.message)
+        errors: error.details.map(detail => ({
+          field: detail.path.join('.'),
+          message: detail.message
+        }))
       });
       return;
     }
 
     const { email, password } = value;
 
-    // Trouver l'utilisateur avec le mot de passe
-    const user = await User.findOne({ email: email.toLowerCase() }).select('+password');
+    // Trouver l'utilisateur
+    const user = await User.findOne({ 
+      email: email.toLowerCase(),
+      isActive: true 
+    }).select('+password');
+
     if (!user) {
       res.status(401).json({
         success: false,
@@ -148,17 +154,8 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    // Vérifier si le compte est actif
-    if (!user.isActive) {
-      res.status(401).json({
-        success: false,
-        message: 'Compte désactivé. Contactez l\'administrateur.'
-      });
-      return;
-    }
-
     // Vérifier le mot de passe
-    const isPasswordValid = await user.comparePassword(password);
+    const isPasswordValid = await (user as any).comparePassword(password);
     if (!isPasswordValid) {
       res.status(401).json({
         success: false,
@@ -173,7 +170,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
 
     // Générer les tokens
     const tokenPayload = {
-      userId: user._id.toString(),
+      userId: (user._id as any).toString(),
       email: user.email,
       role: user.role
     };
@@ -194,8 +191,8 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       }
     });
 
-  } catch (error: any) {
-    console.error('❌ Erreur lors de la connexion:', error);
+  } catch (error) {
+    console.error('Erreur lors de la connexion:', error);
     res.status(500).json({
       success: false,
       message: 'Erreur interne du serveur'
@@ -222,6 +219,13 @@ export const refreshToken = async (req: Request, res: Response): Promise<void> =
 
     // Vérifier le refresh token
     const decoded = verifyRefreshToken(token);
+    if (!decoded) {
+      res.status(401).json({
+        success: false,
+        message: 'Refresh token invalide ou expiré'
+      });
+      return;
+    }
 
     // Vérifier que l'utilisateur existe toujours
     const user = await User.findById(decoded.userId);
@@ -235,7 +239,7 @@ export const refreshToken = async (req: Request, res: Response): Promise<void> =
 
     // Générer un nouveau token d'accès
     const tokenPayload = {
-      userId: user._id.toString(),
+      userId: (user._id as any).toString(),
       email: user.email,
       role: user.role
     };
@@ -250,17 +254,33 @@ export const refreshToken = async (req: Request, res: Response): Promise<void> =
       }
     });
 
-  } catch (error: any) {
-    console.error('❌ Erreur lors du rafraîchissement du token:', error);
-    
-    let message = 'Refresh token invalide';
-    if (error.message === 'Refresh token expiré') {
-      message = 'Refresh token expiré, veuillez vous reconnecter';
-    }
-
-    res.status(401).json({
+  } catch (error) {
+    console.error('Erreur lors du rafraîchissement du token:', error);
+    res.status(500).json({
       success: false,
-      message
+      message: 'Erreur interne du serveur'
+    });
+  }
+};
+
+/**
+ * Déconnexion (côté client principalement)
+ */
+export const logout = async (req: Request, res: Response): Promise<void> => {
+  try {
+    // Dans une implémentation complète, on pourrait blacklister le token
+    // ou le stocker dans une base de données pour l'invalider
+    
+    res.status(200).json({
+      success: true,
+      message: 'Déconnexion réussie'
+    });
+
+  } catch (error) {
+    console.error('Erreur lors de la déconnexion:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur interne du serveur'
     });
   }
 };
@@ -270,24 +290,26 @@ export const refreshToken = async (req: Request, res: Response): Promise<void> =
  */
 export const getProfile = async (req: Request, res: Response): Promise<void> => {
   try {
-    if (!req.user) {
-      res.status(401).json({
+    const userId = (req as any).userId;
+    
+    const user = await User.findById(userId).populate('classId', 'name level');
+    if (!user) {
+      res.status(404).json({
         success: false,
-        message: 'Utilisateur non authentifié'
+        message: 'Utilisateur non trouvé'
       });
       return;
     }
 
     res.status(200).json({
       success: true,
-      message: 'Profil récupéré avec succès',
       data: {
-        user: req.user
+        user: user.toJSON()
       }
     });
 
-  } catch (error: any) {
-    console.error('❌ Erreur lors de la récupération du profil:', error);
+  } catch (error) {
+    console.error('Erreur lors de la récupération du profil:', error);
     res.status(500).json({
       success: false,
       message: 'Erreur interne du serveur'
@@ -300,48 +322,54 @@ export const getProfile = async (req: Request, res: Response): Promise<void> => 
  */
 export const updateProfile = async (req: Request, res: Response): Promise<void> => {
   try {
-    if (!req.user) {
-      res.status(401).json({
-        success: false,
-        message: 'Utilisateur non authentifié'
-      });
-      return;
-    }
+    const userId = (req as any).userId;
+    const { name, level } = req.body;
 
-    const updateSchema = Joi.object({
-      name: Joi.string().min(2).max(100).optional(),
-      level: Joi.string().valid('Débutant', 'Intermédiaire', 'Avancé').optional(),
-      classId: Joi.string().optional().allow(''),
-      avatar: Joi.string().optional().allow('')
-    });
-
-    const { error, value } = updateSchema.validate(req.body);
-    if (error) {
+    // Validation basique
+    if (name && (typeof name !== 'string' || name.trim().length < 2)) {
       res.status(400).json({
         success: false,
-        message: 'Données invalides',
-        errors: error.details.map(detail => detail.message)
+        message: 'Le nom doit contenir au moins 2 caractères'
       });
       return;
     }
 
-    // Mettre à jour l'utilisateur
-    const updatedUser = await User.findByIdAndUpdate(
-      req.user._id,
-      { $set: value },
+    if (level && !['Débutant', 'Intermédiaire', 'Avancé'].includes(level)) {
+      res.status(400).json({
+        success: false,
+        message: 'Niveau invalide'
+      });
+      return;
+    }
+
+    const updateData: any = {};
+    if (name) updateData.name = name.trim();
+    if (level) updateData.level = level;
+
+    const user = await User.findByIdAndUpdate(
+      userId,
+      updateData,
       { new: true, runValidators: true }
-    );
+    ).populate('classId', 'name level');
+
+    if (!user) {
+      res.status(404).json({
+        success: false,
+        message: 'Utilisateur non trouvé'
+      });
+      return;
+    }
 
     res.status(200).json({
       success: true,
       message: 'Profil mis à jour avec succès',
       data: {
-        user: updatedUser
+        user: user.toJSON()
       }
     });
 
-  } catch (error: any) {
-    console.error('❌ Erreur lors de la mise à jour du profil:', error);
+  } catch (error) {
+    console.error('Erreur lors de la mise à jour du profil:', error);
     res.status(500).json({
       success: false,
       message: 'Erreur interne du serveur'
@@ -349,12 +377,3 @@ export const updateProfile = async (req: Request, res: Response): Promise<void> 
   }
 };
 
-/**
- * Déconnexion (côté client principalement)
- */
-export const logout = async (req: Request, res: Response): Promise<void> => {
-  res.status(200).json({
-    success: true,
-    message: 'Déconnexion réussie'
-  });
-};
